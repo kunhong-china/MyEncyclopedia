@@ -1,0 +1,6 @@
+openwakeword
+fast-whisper
+edge-tts
+websockets
+pyaudio
+numpy
