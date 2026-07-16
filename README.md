@@ -7,12 +7,18 @@ The objective of this project is to build a highly responsive, stable, and auton
 The system splits workloads based on hardware strengths, transforming the legacy client into a streamlined thin-client terminal.
 
 
-┌──────────────────────────────────────┐          ┌──────────────────────────────────────┐
-│ MacBook Air (Thin Client)            │          │ Ubuntu Rig (Compute Node)            │
-│ • Hardware: 8GB RAM (Legacy Intel)   │          │ • Hardware: RTX 4090 (24GB VRAM)     │
-│ • Role: Low-overhead I/O & Audio     │◄────────►│ • Role: Routing, Orchestration, LLM  │
-│ • Language: Python                   │  Local   │ • Language: Golang (Core Router)     │
-└──────────────────────────────────────┘ Network  └──────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph Client ["MacBook Air (Thin Client)"]
+        C1[8GB RAM / Python]
+        C2[Low-overhead I/O & Audio]
+    end
+    subgraph Server ["Ubuntu Rig (Compute Node)"]
+        S1[RTX 4090 / Golang]
+        S2[Routing, Orchestration, LLM]
+    end
+    Client <-->|Local Network| Server
+```
 
 
 ### 1. Client Node (MacBook Air)
@@ -32,38 +38,24 @@ The system splits workloads based on hardware strengths, transforming the legacy
 ## Detailed Component Pipeline
 
 
-[User Voice Input] ──► (OpenWakeWord) ──► (Fast-Whisper STT)
-│
-(Text String)
-│
-▼
-┌────────────────────────────────────────────────────────────────────────┐
-│ MACBOOK AIR (Python Client) │
-└───────────────────────────────────┬────────────────────────────────────┘
-│
-[WebSocket Pipe]
-│
-▼
-┌────────────────────────────────────────────────────────────────────────┐
-│ UBUNTU SERVER (Go Router) │
-└───────────────────────────────────┬────────────────────────────────────┘
-│
-┌─────────────────────┴─────────────────────┐
-▼ ▼
-(LangChain / Tools) (Ollama API)
-[Wikipedia, Math, News] [Gemma 2 27B]
-│ │
-└─────────────────────┬─────────────────────┘
-│
-(Token Streaming)
-│
-▼
-┌────────────────────────────────────────────────────────────────────────┐
-│ MACBOOK AIR (Python Client) │
-└───────────────────────────────────┬────────────────────────────────────┘
-│
-▼
-(Edge-TTS Audio) ──► [Audio Output/Speaker]
+```mermaid
+graph TD
+    User([User Voice Input]) --> OWW(OpenWakeWord)
+    OWW --> FW(Fast-Whisper STT)
+    FW -- "Text String" --> MAC1[MacBook Air <br/> Python Client]
+    MAC1 -- "WebSocket Pipe" --> GO_R[Ubuntu Server <br/> Go Router]
+    
+    subgraph Compute ["Ubuntu Backend"]
+        GO_R --> LC[LangChain / Tools <br/> Wikipedia, Math, News]
+        GO_R --> OLL[Ollama API <br/> Gemma 2 27B]
+        LC --> STR[Token Streaming]
+        OLL --> STR
+    end
+
+    STR --> MAC2[MacBook Air <br/> Python Client]
+    MAC2 --> TTS(Edge-TTS Audio)
+    TTS --> SPK([Audio Output/Speaker])
+```
 
 
 ---
