@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"time"
 )
@@ -34,29 +33,27 @@ func (s *Scheduler) StartDailyCron(ollamaClient *OllamaClient) {
 
 func (s *Scheduler) generateBriefing(client *OllamaClient) {
 	prompt := "You are Project Jarvis. Generate a concise, child-friendly daily briefing for July 17th, 2026. Include one fun science fact, a news highlight about space exploration, and a positive motivational quote for the day. Format it as a greeting."
-	
+
 	tokenChan := make(chan string)
 	errChan := make(chan error, 1)
 
 	var fullResponse string
-	go client.Generate(prompt, tokenChan, errChan)
+	go client.Generate(prompt, tokenChan, errChan) // Streaming generator - channel closes when complete
 
+loop:
 	for {
 		select {
-		case token := <-tokenChan:
+		case token, ok := <-tokenChan:
+			if !ok {
+				break loop // Channel closed by Generate - exit outer loop
+			}
 			fullResponse += token
 		case err := <-errChan:
 			log.Printf("Scheduler error generating briefing: %v", err)
 			return
 		}
-		// We wait for completion here since it's a background task
-		if len(fullResponse) > 0 && tokenChan == nil { // This is simplified logic, in reality check the 'done' state from ollama.go if possible or use a separate non-streaming method
-			break
-		}
 	}
-	// Note: The OllamaClient current Generate implementation doesn't send a sentinel for completion via chan
-	// I will adjust it in my mind to assume we collect until the loop breaks natively from the generator.
-	
+
 	s.lastBriefing = fullResponse
 	log.Printf("Daily briefing cached successfully.")
 }

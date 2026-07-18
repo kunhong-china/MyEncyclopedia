@@ -31,8 +31,11 @@ func NewOllamaClient(endpoint, model string) *OllamaClient {
 	}
 }
 
-// Generate implements streaming response from Ollama
+// Generate implements streaming response from Ollama with proper channel lifecycle management.
+// The output channel is always closed on function exit to signal completion to receivers.
 func (c *OllamaClient) Generate(prompt string, tokenChan chan<- string, errChan chan<- error) {
+	defer close(tokenChan) // Ensure channel is closed when generator completes
+
 	reqBody := OllamaRequest{
 		Model:  c.Model,
 		Prompt: prompt,
@@ -43,7 +46,7 @@ func (c *OllamaClient) Generate(prompt string, tokenChan chan<- string, errChan 
 	resp, err := http.Post(c.Endpoint+"/api/generate", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		errChan <- fmt.Errorf("failed to connect to Ollama: %v", err)
-		return
+		return // Channel still closes via defer
 	}
 	defer resp.Body.Close()
 
@@ -52,15 +55,15 @@ func (c *OllamaClient) Generate(prompt string, tokenChan chan<- string, errChan 
 		var response OllamaResponse
 		if err := decoder.Decode(&response); err != nil {
 			if err == io.EOF {
-				break
+				break // Normal stream end, channel will close via defer
 			}
 			errChan <- fmt.Errorf("error decoding Ollama stream: %v", err)
-			return
+			return // Channel still closes via defer
 		}
 
 		tokenChan <- response.Response
 		if response.Done {
-			break
+			break // Ollama signals stream complete, defer closes channel
 		}
 	}
 }

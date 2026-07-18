@@ -1,4 +1,13 @@
-// Wrap handleWebSocket to include briefing logic
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+)
+
+// handleWebSocketWithBriefing manages WebSocket connections with briefing injection.
+// It handles waking word -> STT already processed on client, then streams Ollama responses.
 func (s *Server) handleWebSocketWithBriefing(w http.ResponseWriter, r *http.Request, scheduler *Scheduler) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -11,7 +20,7 @@ func (s *Server) handleWebSocketWithBriefing(w http.ResponseWriter, r *http.Requ
 	s.clients[conn] = true
 	s.mu.Unlock()
 
-	// Push the cached briefing immediately on connection if it exists
+	// Push the cached briefing immediately on connection if it exists (6 AM cron-generated)
 	briefing := scheduler.GetCachedBriefing()
 	if briefing != "" {
 		msg := Message{
@@ -21,7 +30,7 @@ func (s *Server) handleWebSocketWithBriefing(w http.ResponseWriter, r *http.Requ
 		conn.WriteJSON(msg)
 	}
 
-	// Continue with standard prompt loop
+	// Continue with standard prompt loop - streaming from Ollama via Go channels
 	for {
 		var msg Message
 		err := conn.ReadJSON(&msg)
@@ -31,20 +40,26 @@ func (s *Server) handleWebSocketWithBriefing(w http.ResponseWriter, r *http.Requ
 		}
 
 		if msg.Type == "prompt" {
-			tokenChan := make(chan string)
-			errChan := make(chan error, 1)
-			go s.ollamaClient.Generate(msg.Content, tokenChan, errChan)
+			tokenChan := make(chan string)   // Buffered for Ollama streaming tokens
+			errChan := make(chan error, 1)    // Buffered to prevent deadlock on errors
+
+			go s.ollamaClient.Generate(msg.Content, tokenChan, errChan) // Non-blocking streaming call
+
+			// Collect and stream tokens to client until channel closes or error occurs
 			for {
 				select {
-				case token := <-tokenChan:
-					respMsg := Message{Type: "response_token", Content: token}
-					if err := conn.WriteJSON(respMsg); err != nil {
-						return
+				case token, ok := <-tokenChan:
+					if !ok {
+						break // Channel closed by Generate - streaming complete, continue to next prompt loop iteration
 					}
-				case err := <-errChan:
+					respMsg := Message{Type: "response_token", Content: token}
+					conn.WriteJSON(respMsg)
+				case err, ok := <-errChan:
+					if !ok {
+						break // Error channel closed (no error occurred via normal streaming completion)
+					}
 					errMsg := Message{Type: "system_info", Content: fmt.Sprintf("Error: %v", err)}
 					conn.WriteJSON(errMsg)
-					break 
 				}
 			}
 		}
