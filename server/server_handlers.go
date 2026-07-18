@@ -4,68 +4,105 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 // handleWebSocketWithBriefing manages WebSocket connections with briefing injection.
-// It handles waking word -> STT already processed on client, then streams Ollama responses.
 func (s *Server) handleWebSocketWithBriefing(w http.ResponseWriter, r *http.Request, scheduler *Scheduler) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("Upgrade error: %v", err)
+		log.Printf("❌ Upgrade error: %v", err)
 		return
 	}
 	defer conn.Close()
 
+	clientAddr := r.RemoteAddr
+	log.Printf("✅ Client connected: %s", clientAddr)
+
 	s.mu.Lock()
 	s.clients[conn] = true
+	clientCount := len(s.clients)
 	s.mu.Unlock()
+	
+	log.Printf("📊 Active clients: %d", clientCount)
 
-	// Push the cached briefing immediately on connection if it exists (6 AM cron-generated)
+	// Set read/write deadlines to prevent hung connections
+	conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+	conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+
+	// Push cached briefing immediately on connection if it exists
 	briefing := scheduler.GetCachedBriefing()
 	if briefing != "" {
 		msg := Message{
 			Type:    "response_token",
 			Content: "Good morning! Your daily briefing is ready:\n\n" + briefing,
 		}
-		conn.WriteJSON(msg)
+		if err := conn.WriteJSON(msg); err != nil {
+			log.Printf("❌ Error sending briefing to %s: %v", clientAddr, err)
+		}
 	}
 
-	// Continue with standard prompt loop - streaming from Ollama via Go channels
+	// Main prompt handling loop
 	for {
+		// Reset read deadline for each message
+		conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+		
 		var msg Message
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			log.Printf("Read error from %s: %v", r.RemoteAddr, err)
+			log.Printf("📴 Client %s disconnected: %v", clientAddr, err)
 			break
 		}
 
 		if msg.Type == "prompt" {
-			tokenChan := make(chan string)   // Buffered for Ollama streaming tokens
-			errChan := make(chan error, 1)    // Buffered to prevent deadlock on errors
+			log.Printf("💬 [%s] Prompt: %s", clientAddr, msg.Content)
+			
+			tokenChan := make(chan string)
+			errChan := make(chan error, 1)
 
-			go s.ollamaClient.Generate(msg.Content, tokenChan, errChan) // Non-blocking streaming call
+			go s.ollamaClient.Generate(msg.Content, tokenChan, errChan)
 
-			// Collect and stream tokens to client until channel closes or error occurs
+		streamLoop:
 			for {
 				select {
 				case token, ok := <-tokenChan:
 					if !ok {
-						break // Channel closed by Generate - streaming complete, continue to next prompt loop iteration
+						log.Printf("✅ [%s] Response complete", clientAddr)
+						break streamLoop
 					}
+					
 					respMsg := Message{Type: "response_token", Content: token}
-					conn.WriteJSON(respMsg)
-				case err, ok := <-errChan:
-					if !ok {
-						break // Error channel closed (no error occurred via normal streaming completion)
+					conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+					
+					if err := conn.WriteJSON(respMsg); err != nil {
+						log.Printf("❌ Write error to %s: %v", clientAddr, err)
+						s.cleanupClient(conn)
+						return
 					}
-					errMsg := Message{Type: "system_info", Content: fmt.Sprintf("Error: %v", err)}
+					
+				case err := <-errChan:
+					log.Printf("⚠️  [%s] Ollama error: %v", clientAddr, err)
+					errMsg := Message{
+						Type:    "system_info",
+						Content: fmt.Sprintf("I encountered an error: %v. Please try again.", err),
+					}
 					conn.WriteJSON(errMsg)
+					break streamLoop
 				}
 			}
 		}
 	}
 
+	s.cleanupClient(conn)
+}
+
+func (s *Server) cleanupClient(conn *websocket.Conn) {
 	s.mu.Lock()
 	delete(s.clients, conn)
+	clientCount := len(s.clients)
 	s.mu.Unlock()
+	
+	log.Printf("📊 Active clients: %d", clientCount)
 }

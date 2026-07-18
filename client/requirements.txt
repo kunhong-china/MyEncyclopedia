@@ -4,3 +4,4 @@ edge-tts
 websockets
 pyaudio
 numpy
+python-dotenv

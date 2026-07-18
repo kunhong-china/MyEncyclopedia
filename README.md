@@ -78,15 +78,46 @@ To combat aggressive macOS power management and "App Nap" states, the cron engin
 ```text
 ├── client/                 # Python-based Thin Client for MacBook Air
 │   ├── main.py             # Event loop managing WakeWord -> STT -> WS -> TTS
-│   ├── audio.py            # Microphones, filters, and Fast-Whisper wrappers
-│   └── requirements.txt    # Python dependencies (openwakeword, fast-whisper, edge-tts)
+│   ├── requirements.txt    # Python dependencies (openwakeword, fast-whisper, edge-tts)
+│   ├── .env.example        # Configuration template
+│   ├── run.sh              # Quick start script for client
+│   └── jarvis.service      # Systemd service file for auto-start
 │
 ├── server/                 # Golang-based Compute Engine for Ubuntu
 │   ├── main.go             # Entry point, WebSocket upgrader, and server routing
 │   ├── ollama.go           # Native bindings/API client calls to Gemma 27B
 │   ├── scheduler.go        # Chrono routines for the 6:00 AM news pipeline
-│   └── go.mod              # Go module definition and dependencies (gorilla/websocket)
+│   ├── server_handlers.go  # WebSocket connection and message handlers
+│   ├── .env.example        # Configuration template
+│   ├── run.sh              # Quick start script for server
+│   ├── go.mod              # Go module definition and dependencies
+│   └── go.sum              # Go dependency checksums
 │
-└── README.md               # Architecture documentation
+├── setup.sh                # Automated setup script for both client and server
+├── README.md               # Architecture documentation
+├── DEPLOYMENT.md           # Deployment guide
+└── TEST_PLAN.md            # Testing strategy
 ```
+
+## Quick Start
+
+1. **Clone and setup:**
+   ```bash
+   ./setup.sh
+   ```
+
+2. **Configure:**
+   - Edit `server/.env` with your Ollama settings
+   - Edit `client/.env` with your server IP address
+
+3. **Run (development):**
+   ```bash
+   # Terminal 1 - Start server
+   cd server && ./run.sh
+   
+   # Terminal 2 - Start client
+   cd client && ./run.sh
+   ```
+
+For production deployment, see [DEPLOYMENT.md](DEPLOYMENT.md).
 

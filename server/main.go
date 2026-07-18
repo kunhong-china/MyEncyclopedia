@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -30,27 +31,37 @@ func NewServer(ollamaEndpoint, ollamaModel string) *Server {
 	}
 }
 
-func main() {
-	// Configuration constants
-	const (
-		Port           = ":8080"
-		OllamaEndpoint = "http://localhost:11434"
-		OllamaModel    = "gemma2:27b"
-	)
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
-	server := NewServer(OllamaEndpoint, OllamaModel)
+func main() {
+	// Configuration with environment variable support
+	port := getEnv("JARVIS_PORT", ":8080")
+	ollamaEndpoint := getEnv("OLLAMA_ENDPOINT", "http://localhost:11434")
+	ollamaModel := getEnv("OLLAMA_MODEL", "gemma2:27b")
+
+	server := NewServer(ollamaEndpoint, ollamaModel)
 	scheduler := NewScheduler()
 	
 	// Start the background cron job
 	scheduler.StartDailyCron(server.ollamaClient)
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		// We wrap the handler to inject the scheduler's briefing if needed
 		server.handleWebSocketWithBriefing(w, r, scheduler)
 	})
 
-	log.Printf("Jarvis Compute Node starting on %s...", Port)
-	if err := http.ListenAndServe(Port, nil); err != nil {
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	log.Printf("🚀 Jarvis Compute Node starting on %s...", port)
+	log.Printf("📡 Ollama endpoint: %s (model: %s)", ollamaEndpoint, ollamaModel)
+	if err := http.ListenAndServe(port, nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
