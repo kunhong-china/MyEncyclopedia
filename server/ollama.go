@@ -45,7 +45,7 @@ func (c *OllamaClient) Generate(prompt string, tokenChan chan<- string, errChan 
 	jsonBody, _ := json.Marshal(reqBody)
 	resp, err := http.Post(c.Endpoint+"/api/generate", "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		errChan <- fmt.Errorf("failed to connect to Ollama: %v", err)
+		errChan <- fmt.Errorf("failed to connect to Ollama: %w", err)
 		return // Channel still closes via defer
 	}
 	defer resp.Body.Close()
@@ -57,7 +57,7 @@ func (c *OllamaClient) Generate(prompt string, tokenChan chan<- string, errChan 
 			if err == io.EOF {
 				break // Normal stream end, channel will close via defer
 			}
-			errChan <- fmt.Errorf("error decoding Ollama stream: %v", err)
+			errChan <- fmt.Errorf("error decoding Ollama stream: %w", err)
 			return // Channel still closes via defer
 		}
 

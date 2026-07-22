@@ -42,7 +42,7 @@ func main() {
 	// Configuration with environment variable support
 	port := getEnv("JARVIS_PORT", ":8080")
 	ollamaEndpoint := getEnv("OLLAMA_ENDPOINT", "http://localhost:11434")
-	ollamaModel := getEnv("OLLAMA_MODEL", "gemma2:27b")
+	ollamaModel := getEnv("OLLAMA_MODEL", "gemma4:31b")
 
 	server := NewServer(ollamaEndpoint, ollamaModel)
 	scheduler := NewScheduler()

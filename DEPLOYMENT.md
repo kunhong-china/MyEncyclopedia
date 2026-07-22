@@ -38,7 +38,7 @@ This will configure both the client and server automatically. Then:
 ### B. Model Installation
 Pull the Gemma 2 27B model:
 ```bash
-ollama pull gemma2:27b
+ollama pull gemma4:31b
 ```
 
 ### C. Server Configuration
@@ -52,7 +52,7 @@ ollama pull gemma2:27b
    ```bash
    JARVIS_PORT=:8080
    OLLAMA_ENDPOINT=http://localhost:11434
-   OLLAMA_MODEL=gemma2:27b
+   OLLAMA_MODEL=gemma4:31b
    ```
 
 ### D. Server Deployment
@@ -147,7 +147,7 @@ To have Jarvis start automatically on boot as a background daemon:
 ## 4. Architecture Summary
 
 - **Client (Mint):** Wake Word → Fast-Whisper STT → WebSocket → Edge-TTS Audio
-- **Server (Ubuntu):** Go Router → Ollama (`gemma2:27b`) → Token Streaming
+- **Server (Ubuntu):** Go Router → Ollama (`gemma4:31b`) → Token Streaming
 - **Automation:** Server generates a daily briefing at 6 AM; pushed to client upon first connection
 - **Error Handling:** Automatic reconnection on network failures
 - **Configuration:** Environment-based config for easy deployment

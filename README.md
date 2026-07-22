@@ -1,9 +1,18 @@
 # Project Jarvis: High-Performance AI Knowledge Agent
 An ultra-low-latency, stable, and child-friendly AI Knowledge Agent designed to run seamlessly across a local network. The system utilizes a lightweight client-server architecture, offloading heavy orchestration and LLM reasoning to a dedicated Linux GPU server while maintaining low-overhead hardware input/output (I/O) on a legacy client machine.
----## Project Purpose & Goals
+
+## Project Purpose & Goals
 The objective of this project is to build a highly responsive, stable, and autonomous "Jarvis-like" companion for interactive learning. 
-*   **Educational Companion**: Provides instant access to encyclopedic knowledge, Wikipedia, scientific computation, and real-time news in a safe, child-friendly format.*   **Zero-Throttling Architecture**: Replaces fragile, third-party frameworks with a custom pipeline, eliminating memory bottlenecks and connection timeouts.*   **Blazing Fast Performance**: Leverages local network streaming and hardware-native execution to achieve a sub-second Time-to-First-Token (TTFT) response layer.*   **Autonomous Reliability**: Implements a server-side automation scheduler that functions independently of client machine sleep states or network drops.
----## Hardware Architecture & Responsibilities
+
+**Educational Companion**: Provides instant access to encyclopedic knowledge, Wikipedia, scientific computation, and real-time news in a safe, child-friendly format.
+
+**Zero-Throttling Architecture**: Replaces fragile, third-party frameworks with a custom pipeline, eliminating memory bottlenecks and connection timeouts.
+
+**Blazing Fast Performance**: Leverages local network streaming and hardware-native execution to achieve a sub-second Time-to-First-Token (TTFT) response layer.   
+
+**Autonomous Reliability**: Implements a server-side automation scheduler that functions independently of client machine sleep states or network drops.
+
+## Hardware Architecture & Responsibilities
 The system splits workloads based on hardware strengths, transforming the legacy client into a streamlined thin-client terminal.
 
 
@@ -29,11 +38,10 @@ graph LR
 
 ### 2. Compute Node (Ubuntu Server)
 *   **Core Logic Router**: A native **Golang** binary managing high-concurrency WebSocket channels, stream multiplexing, and task routing.
-*   **Inference Brain**: Hosts `Ollama` running a 27B/31B parameter model (`gemma2:27b`) completely in the 24GB VRAM of an RTX 4090.
+*   **Inference Brain**: Hosts `Ollama` running a 27B/31B parameter model (`gemma4:31b`) completely in the 24GB VRAM of an RTX 4090.
 *   **Vision Engine**: Evaluates incoming camera frames using locally hosted vision-language models.
 *   **Background Cron Engine**: Manages the persistent 6:00 AM automation loop for scraping, distilling, and caching daily news bulletins.
 
----
 
 ## Detailed Component Pipeline
 
@@ -93,7 +101,7 @@ To combat aggressive macOS power management and "App Nap" states, the cron engin
 │   ├── go.mod              # Go module definition and dependencies
 │   └── go.sum              # Go dependency checksums
 │
-├── setup.sh                # Automated setup script for both client and server
+├── setup.sh                # Automated setup script for client, server, or both
 ├── README.md               # Architecture documentation
 ├── DEPLOYMENT.md           # Deployment guide
 └── TEST_PLAN.md            # Testing strategy
@@ -105,6 +113,7 @@ To combat aggressive macOS power management and "App Nap" states, the cron engin
    ```bash
    ./setup.sh
    ```
+    Use `./setup.sh --client` on the thin client machine or `./setup.sh --server` on the compute node.
 
 2. **Configure:**
    - Edit `server/.env` with your Ollama settings
